@@ -12,6 +12,7 @@ github_repos:
 apt_packages:
   - tmux
   - git
+  - git-lfs
   - curl
   - wget
   - unzip

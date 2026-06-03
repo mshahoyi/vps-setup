@@ -51,6 +51,11 @@
       changed_when: false
       tags: [git]
 
+    - name: Initialize Git LFS global filters
+      ansible.builtin.command: git lfs install --skip-repo
+      changed_when: false
+      tags: [git]
+
     # ---------------------------------------------------- node + claude code -
     - name: Check whether Node is installed
       ansible.builtin.command: node --version
