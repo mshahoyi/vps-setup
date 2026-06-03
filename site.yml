@@ -32,11 +32,13 @@
         state: present
       tags: [base]
 
-    - name: Install tmux config
-      ansible.builtin.copy:
-        src: files/tmux.conf
-        dest: "{{ ansible_env.HOME }}/.tmux.conf"
-        mode: "0644"
+    - name: Symlink dotfiles from the repo into $HOME
+      ansible.builtin.file:
+        src: "{{ repo_dir }}/{{ item.src }}"
+        dest: "{{ ansible_env.HOME }}/{{ item.dest }}"
+        state: link
+        force: true
+      loop: "{{ dotfiles }}"
       tags: [base, dotfiles]
 
     # ------------------------------------------------------------- git cfg ---
@@ -94,6 +96,30 @@
         update: false # clone if missing; never clobber local work
       loop: "{{ github_repos }}"
       tags: [repos]
+
+    # --------------------------------------------- in-place config repos -----
+    - name: Deploy config repos in place (e.g. ~/.claude)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        DIR="{{ item.dest }}"
+        URL="{{ item.url }}"
+        if [ -d "$DIR/.git" ]; then
+          git -C "$DIR" pull --ff-only
+        elif [ -d "$DIR" ]; then
+          # adopt an existing non-git dir; repo wins for tracked files,
+          # gitignored runtime files (creds/history) are left untouched
+          git -C "$DIR" init -q
+          git -C "$DIR" remote add origin "$URL" 2>/dev/null || git -C "$DIR" remote set-url origin "$URL"
+          git -C "$DIR" fetch -q origin
+          git -C "$DIR" checkout -f -B main origin/main
+        else
+          git clone -q "$URL" "$DIR"
+        fi
+      args:
+        executable: /bin/bash
+      loop: "{{ config_repos }}"
+      changed_when: false
+      tags: [config]
 
     # ------------------------------------------------------------ hardening --
     - name: Harden the box (firewall, fail2ban, key-only SSH, auto-updates)

@@ -29,6 +29,22 @@ apt_packages:
 # Node major version (for Claude Code, etc.)
 node_major: "22"
 
+# ----------------------------------------------------------------- dotfiles --
+# This repo's checkout on the box (bootstrap clones here). Single-file dotfiles
+# are symlinked from it into $HOME, so editing one on the box edits the repo file
+# -> just `git -C ~/vps-setup commit && push` to version the change.
+repo_dir: "{{ ansible_env.HOME }}/vps-setup"
+
+dotfiles:
+  - { src: files/tmux.conf, dest: .tmux.conf }
+
+# Whole-directory config repos, cloned in place to `dest` (like ~/.claude on your
+# laptop). Existing git clones are pulled --ff-only; an existing non-git dir (e.g.
+# created by running `claude` first) is adopted without touching gitignored
+# runtime files (credentials, history).
+config_repos:
+  - { url: "https://github.com/mshahoyi/claude.git", dest: "{{ ansible_env.HOME }}/.claude" }
+
 # Global git identity (edit to taste)
 git_user_name: "mshahoyi"
 git_user_email: "muyabb@gmail.com"
