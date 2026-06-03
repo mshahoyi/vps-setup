@@ -4,6 +4,20 @@
   become: true
   gather_facts: true
 
+  vars:
+    ssh_port: 22
+
+  handlers:
+    - name: restart ssh
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
+
+    - name: restart fail2ban
+      ansible.builtin.service:
+        name: fail2ban
+        state: restarted
+
   tasks:
     # ---------------------------------------------------------------- base ---
     - name: Update apt cache
@@ -78,3 +92,8 @@
         update: false # clone if missing; never clobber local work
       loop: "{{ github_repos }}"
       tags: [repos]
+
+    # ------------------------------------------------------------ hardening --
+    - name: Harden the box (firewall, fail2ban, key-only SSH, auto-updates)
+      ansible.builtin.import_tasks: tasks/hardening.yml
+      tags: [hardening]

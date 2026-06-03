@@ -32,3 +32,26 @@ node_major: "22"
 # Global git identity (edit to taste)
 git_user_name: "Mo"
 git_user_email: "muyabb@gmail.com"
+
+# ----------------------------------------------------------------- hardening -
+# SSH login keys are pulled from this GitHub user's public keys
+# (https://github.com/<user>.keys). You must hold the matching private key
+# locally, or you'll lock yourself out. If no keys are found there, the playbook
+# leaves password auth ENABLED and warns instead of locking you out.
+github_keys_user: mshahoyi
+
+# Disable SSH password auth + root password login (key-only). Only takes effect
+# if a key was successfully installed from GitHub above.
+disable_password_auth: true
+
+# Optional: also create a non-root sudo user (key-only). Off by default because
+# the unattended automation + repo clones currently run as root. Flip on once
+# you restructure to run automation as this user.
+create_admin_user: false
+admin_user: mo
+
+# Fine-grained PAT for UNATTENDED git access (optional). NEVER hardcode/commit it.
+# Pass at runtime so it's only ever in memory + a 0600 file:
+#   GITHUB_PAT=github_pat_xxx ansible-playbook -i inventory.ini site.yml --tags hardening
+# See SECURITY.md for how to scope it (least privilege + short expiry).
+github_pat: "{{ lookup('env', 'GITHUB_PAT') | default('', true) }}"

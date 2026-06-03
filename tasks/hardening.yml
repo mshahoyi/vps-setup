@@ -1,0 +1,163 @@
+---
+# Box hardening: firewall, intrusion banning, auto-patching, key-only SSH,
+# optional non-root user, and optional unattended git credential.
+#
+# Safety: this NEVER disables password auth unless an SSH key was successfully
+# installed from GitHub first — so a misconfig warns instead of locking you out.
+
+# ----------------------------------------------------------- packages --------
+- name: Install hardening packages
+  ansible.builtin.apt:
+    name:
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+    state: present
+
+# ------------------------------------------------ automatic security updates -
+- name: Enable unattended security upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+# ----------------------------------------------------------- firewall (ufw) --
+# Allow SSH BEFORE enabling, so we don't drop our own connection.
+- name: Allow SSH through the firewall
+  ansible.builtin.command: "ufw allow {{ ssh_port | default(22) }}/tcp"
+  changed_when: false
+
+- name: Default-deny incoming traffic
+  ansible.builtin.command: ufw --force default deny incoming
+  changed_when: false
+
+- name: Default-allow outgoing traffic
+  ansible.builtin.command: ufw --force default allow outgoing
+  changed_when: false
+
+- name: Enable the firewall
+  ansible.builtin.command: ufw --force enable
+  changed_when: false
+
+# --------------------------------------------------------------- fail2ban ----
+- name: Configure fail2ban to protect SSH
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    mode: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      port = {{ ssh_port | default(22) }}
+      maxretry = 5
+      bantime = 1h
+      findtime = 10m
+  notify: restart fail2ban
+
+- name: Enable and start fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    enabled: true
+    state: started
+
+# ------------------------------------------------- SSH keys from GitHub ------
+- name: Fetch your public SSH keys from GitHub
+  ansible.builtin.uri:
+    url: "https://github.com/{{ github_keys_user }}.keys"
+    return_content: true
+  register: gh_keys
+  failed_when: false
+
+- name: Record whether usable SSH keys were found
+  ansible.builtin.set_fact:
+    have_ssh_keys: "{{ gh_keys.status == 200 and (gh_keys.content | trim | length > 0) }}"
+
+- name: Ensure root .ssh dir exists
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    mode: "0700"
+  when: have_ssh_keys
+
+- name: Install root authorized_keys from GitHub
+  ansible.builtin.copy:
+    dest: /root/.ssh/authorized_keys
+    content: "{{ gh_keys.content }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: have_ssh_keys
+
+# ------------------------------------------ optional non-root sudo user ------
+- name: Set up non-root admin user
+  when: create_admin_user | bool
+  block:
+    - name: Create admin user
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        groups: sudo
+        shell: /bin/bash
+        create_home: true
+
+    - name: Grant passwordless sudo to admin user
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/90-{{ admin_user }}"
+        content: "{{ admin_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: "visudo -cf %s"
+
+    - name: Ensure admin .ssh dir exists
+      ansible.builtin.file:
+        path: "/home/{{ admin_user }}/.ssh"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: "0700"
+
+    - name: Install admin authorized_keys from GitHub
+      ansible.builtin.copy:
+        dest: "/home/{{ admin_user }}/.ssh/authorized_keys"
+        content: "{{ gh_keys.content }}"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: "0600"
+      when: have_ssh_keys
+
+# ----------------------------------------------------- SSH daemon hardening --
+- name: Harden sshd (key-only login)
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-hardening.conf
+    mode: "0644"
+    content: |
+      Port {{ ssh_port | default(22) }}
+      PasswordAuthentication no
+      PermitRootLogin prohibit-password
+      PubkeyAuthentication yes
+      ChallengeResponseAuthentication no
+  when: disable_password_auth | bool and have_ssh_keys
+  notify: restart ssh
+
+- name: WARN — no SSH keys found, leaving password login enabled
+  ansible.builtin.debug:
+    msg: >-
+      No SSH keys at https://github.com/{{ github_keys_user }}.keys —
+      password login left ENABLED to avoid lockout. Add a key
+      (ssh-keygen, then `gh ssh-key add` or GitHub > Settings > SSH keys),
+      then re-run:  ansible-playbook -i inventory.ini site.yml --tags hardening
+  when: not have_ssh_keys
+
+# --------------------------------- optional unattended git credential (PAT) --
+- name: Store fine-grained PAT for unattended git
+  when: github_pat | length > 0
+  no_log: true
+  block:
+    - name: Write git credential store (0600, root-only)
+      ansible.builtin.copy:
+        dest: "{{ ansible_env.HOME }}/.git-credentials"
+        content: "https://{{ github_keys_user }}:{{ github_pat }}@github.com\n"
+        mode: "0600"
+
+    - name: Enable git credential store helper
+      ansible.builtin.command: git config --global credential.helper store
+      changed_when: false

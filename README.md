@@ -35,6 +35,18 @@ You'll be prompted exactly twice:
 Everything else — apt packages, tmux, Node, Claude Code install, repo clones — is
 non-interactive.
 
+## Security
+
+The box is hardened by default (key-only SSH, firewall, fail2ban, auto-updates).
+**Read [SECURITY.md](SECURITY.md) before relying on it** — especially the note that a
+secret on the box is only as safe as the box (root compromise = secret compromise),
+and the recipe for a least-privilege, expiring PAT for unattended git access.
+
+Before key-only SSH locks in, make sure you have an SSH key registered on GitHub that
+you hold locally (`ssh-keygen` + `gh ssh-key add`). If none is found at
+`github.com/<you>.keys`, the playbook leaves password login on and warns rather than
+locking you out.
+
 ## Customizing
 
 Edit `group_vars/all.yml`:
