@@ -30,7 +30,7 @@ apt_packages:
 node_major: "22"
 
 # Global git identity (edit to taste)
-git_user_name: "Mo"
+git_user_name: "mshahoyi"
 git_user_email: "muyabb@gmail.com"
 
 # ----------------------------------------------------------------- hardening -
