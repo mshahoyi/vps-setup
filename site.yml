@@ -1,0 +1,80 @@
+---
+- name: Provision dev VPS
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    # ---------------------------------------------------------------- base ---
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      tags: [base]
+
+    - name: Install base apt packages
+      ansible.builtin.apt:
+        name: "{{ apt_packages }}"
+        state: present
+      tags: [base]
+
+    - name: Install tmux config
+      ansible.builtin.copy:
+        src: files/tmux.conf
+        dest: "{{ ansible_env.HOME }}/.tmux.conf"
+        mode: "0644"
+      tags: [base, dotfiles]
+
+    # ------------------------------------------------------------- git cfg ---
+    - name: Configure global git identity
+      ansible.builtin.command: "git config --global {{ item.key }} {{ item.value | quote }}"
+      loop:
+        - { key: "user.name", value: "{{ git_user_name }}" }
+        - { key: "user.email", value: "{{ git_user_email }}" }
+        - { key: "init.defaultBranch", value: "main" }
+      changed_when: false
+      tags: [git]
+
+    # ---------------------------------------------------- node + claude code -
+    - name: Check whether Node is installed
+      ansible.builtin.command: node --version
+      register: node_v
+      failed_when: false
+      changed_when: false
+      tags: [node]
+
+    - name: Install Node from NodeSource
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_major }}.x | bash -
+        apt-get install -y nodejs
+      when: node_v.rc != 0
+      tags: [node]
+
+    - name: Check whether Claude Code is installed
+      ansible.builtin.command: which claude
+      register: claude_bin
+      failed_when: false
+      changed_when: false
+      tags: [claude]
+
+    - name: Install Claude Code (npm global)
+      ansible.builtin.command: npm install -g @anthropic-ai/claude-code
+      when: claude_bin.rc != 0
+      tags: [claude]
+
+    # ---------------------------------------------------------------- repos --
+    - name: Ensure dev directory exists
+      ansible.builtin.file:
+        path: "{{ dev_dir }}"
+        state: directory
+        mode: "0755"
+      tags: [repos]
+
+    - name: Clone GitHub repos
+      ansible.builtin.git:
+        repo: "https://github.com/{{ item }}.git"
+        dest: "{{ dev_dir }}/{{ item.split('/')[1] }}"
+        update: false # clone if missing; never clobber local work
+      loop: "{{ github_repos }}"
+      tags: [repos]

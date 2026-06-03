@@ -1,0 +1,34 @@
+---
+# Where repos get cloned
+dev_dir: "{{ ansible_env.HOME }}/dev"
+
+# Repos to clone (owner/name). Cloned over HTTPS using gh's credential helper,
+# so private repos work as long as `gh auth login` succeeded in bootstrap.
+github_repos:
+  - z3research/colm2026
+  - z3research/auditing-agents
+
+# Base apt packages
+apt_packages:
+  - tmux
+  - git
+  - curl
+  - wget
+  - unzip
+  - build-essential
+  - ca-certificates
+  - ripgrep
+  - fd-find
+  - fzf
+  - htop
+  - jq
+  - tree
+  - python3-pip
+  - python3-venv
+
+# Node major version (for Claude Code, etc.)
+node_major: "22"
+
+# Global git identity (edit to taste)
+git_user_name: "Mo"
+git_user_email: "muyabb@gmail.com"
