@@ -60,6 +60,26 @@ repo, read-only. More setup per repo; pick this if you want the strongest scopin
 - **Optional non-root sudo user** — set `create_admin_user: true` for privilege
   separation (off by default while automation runs as root).
 
+### Tailscale: take SSH off the public internet (recommended)
+
+Key-only SSH still leaves port 22 exposed to scanners. Tailscale puts SSH on a
+private WireGuard mesh so the port can be removed from the public internet
+entirely — the single biggest remaining attack-surface reduction.
+
+Flow (order matters — never lock yourself out):
+1. `ansible-playbook -i inventory.ini site.yml --tags tailscale` — installs
+   Tailscale and allows the `tailscale0` interface through ufw.
+2. `tailscale up` on the box — prints a URL; approve it in your browser (sign in
+   with GitHub/Google to create/join your tailnet). Or pass
+   `TAILSCALE_AUTHKEY=tskey-...` at runtime for non-interactive bring-up.
+3. **Verify** you can `ssh root@<tailscale-ip>` over the tailnet.
+4. Only then set `tailscale_lock_ssh: true` and re-run `--tags tailscale` to
+   remove public port 22.
+
+Recovery if anything goes wrong: Contabo's web console reaches the VM regardless
+of the firewall. Also set a device-key expiry / ACLs in the Tailscale admin
+console rather than "allow all."
+
 ### Before you enable key-only login
 Make sure you have an SSH key on your GitHub account that you hold the private key
 for locally, or you'll lock yourself out:

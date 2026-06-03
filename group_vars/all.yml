@@ -67,6 +67,17 @@ disable_password_auth: true
 create_admin_user: false
 admin_user: mo
 
+# ----------------------------------------------------------------- tailscale -
+# Put SSH on a private WireGuard mesh so port 22 can leave the public internet.
+# After install, authenticate once with `tailscale up` (prints a URL to approve
+# in your browser), OR pass an auth key non-interactively at runtime:
+#   TAILSCALE_AUTHKEY=tskey-... ansible-playbook ... --tags tailscale
+tailscale_authkey: "{{ lookup('env', 'TAILSCALE_AUTHKEY') | default('', true) }}"
+tailscale_hostname: contabo
+# OPT-IN lockdown: only set true AFTER confirming you can SSH over the tailnet,
+# or you'll cut public SSH (recover via Contabo's web console).
+tailscale_lock_ssh: false
+
 # Fine-grained PAT for UNATTENDED git access (optional). NEVER hardcode/commit it.
 # Pass at runtime so it's only ever in memory + a 0600 file:
 #   GITHUB_PAT=github_pat_xxx ansible-playbook -i inventory.ini site.yml --tags hardening

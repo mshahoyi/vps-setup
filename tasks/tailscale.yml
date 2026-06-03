@@ -1,0 +1,33 @@
+---
+# Put SSH on a private Tailscale (WireGuard) mesh so port 22 can leave the
+# public internet. Install + firewall are safe to run anytime. Authentication
+# and closing port 22 are deliberate steps so you never auto-lock yourself out.
+#
+# Recommended flow:
+#   1. ansible-playbook ... --tags tailscale      # install + allow tailscale0
+#   2. tailscale up                               # authenticate (browser URL)
+#   3. verify: ssh over the tailnet IP works
+#   4. set tailscale_lock_ssh=true, re-run        # then public 22 is removed
+
+- name: Install Tailscale (official script, idempotent)
+  ansible.builtin.shell: curl -fsSL https://tailscale.com/install.sh | sh
+  args:
+    creates: /usr/bin/tailscale
+
+- name: Allow inbound traffic on the tailscale interface
+  ansible.builtin.command: ufw allow in on tailscale0
+  changed_when: false
+
+- name: Bring node onto the tailnet with an auth key (optional, non-interactive)
+  ansible.builtin.command: >-
+    tailscale up
+    --hostname={{ tailscale_hostname }}
+    --authkey={{ tailscale_authkey }}
+  when: tailscale_authkey | length > 0
+  no_log: true
+
+- name: Remove public SSH (port 22) from the firewall — OPT-IN lockdown
+  ansible.builtin.command: "ufw delete allow {{ ssh_port | default(22) }}/tcp"
+  when: tailscale_lock_ssh | bool
+  changed_when: false
+  failed_when: false

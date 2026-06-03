@@ -130,3 +130,8 @@
     - name: Harden the box (firewall, fail2ban, key-only SSH, auto-updates)
       ansible.builtin.import_tasks: tasks/hardening.yml
       tags: [hardening]
+
+    # ------------------------------------------------------------ tailscale --
+    - name: Set up Tailscale (private SSH mesh)
+      ansible.builtin.import_tasks: tasks/tailscale.yml
+      tags: [tailscale]
