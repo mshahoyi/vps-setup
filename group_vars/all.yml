@@ -7,6 +7,8 @@ dev_dir: "{{ ansible_env.HOME }}/dev"
 github_repos:
   - z3research/colm2026
   - z3research/auditing-agents
+  - attolabs/layali
+  - attolabs/attolabs-web
 
 # Base apt packages
 apt_packages:
