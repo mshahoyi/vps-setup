@@ -74,6 +74,38 @@
       when: node_v.rc != 0
       tags: [node]
 
+    - name: Check whether pnpm is installed
+      ansible.builtin.command: pnpm --version
+      register: pnpm_v
+      failed_when: false
+      changed_when: false
+      tags: [node, pnpm]
+
+    - name: Install pnpm via corepack and configure PNPM_HOME
+      ansible.builtin.shell: |
+        set -euo pipefail
+        corepack enable pnpm
+        corepack prepare pnpm@latest --activate
+        pnpm setup   # creates $PNPM_HOME (+bin) and adds it to the shell profile
+      args:
+        executable: /bin/bash
+      when: pnpm_v.rc != 0
+      tags: [node, pnpm]
+
+    # pnpm guards `config set` behind "$PNPM_HOME/bin must be in PATH", so the
+    # env below is required even though `pnpm setup` already persisted it to the
+    # shell profile (that profile isn't sourced for this non-interactive task).
+    - name: Harden pnpm against supply-chain attacks (release-age cooldown)
+      ansible.builtin.command: pnpm config set --global {{ item.key }} {{ item.value }}
+      loop:
+        - { key: minimumReleaseAge, value: "{{ pnpm_minimum_release_age }}" }
+        - { key: minimumReleaseAgeStrict, value: "false" }
+      environment:
+        PNPM_HOME: "{{ ansible_env.HOME }}/.local/share/pnpm"
+        PATH: "{{ ansible_env.HOME }}/.local/share/pnpm/bin:{{ ansible_env.PATH }}"
+      changed_when: false # declaratively pins fixed values; idempotent
+      tags: [node, pnpm]
+
     - name: Check whether Claude Code is installed
       ansible.builtin.command: which claude
       register: claude_bin

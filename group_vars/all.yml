@@ -33,6 +33,11 @@ apt_packages:
 # Node major version (for Claude Code, etc.)
 node_major: "22"
 
+# pnpm is installed via corepack (ships with Node). This is the supply-chain
+# release-age cooldown (in MINUTES) applied globally: refuse npm package versions
+# younger than this, so freshly-published hijacked versions are dodged. 14400 = 10 days.
+pnpm_minimum_release_age: "14400"
+
 # ----------------------------------------------------------------- dotfiles --
 # This repo's checkout on the box (bootstrap clones here). Single-file dotfiles
 # are symlinked from it into $HOME, so editing one on the box edits the repo file
