@@ -71,3 +71,18 @@ The local-run model above is simplest. If you'd rather manage one (or many) serv
 from your laptop the classic way, edit `inventory.ini` (a `[vps]` group is stubbed in)
 and run `ansible-playbook site.yml` from your laptop — no need to install Ansible on
 the server. Requires SSH access (a key in `~/.ssh/authorized_keys` on the box).
+
+## Client (macOS): mount the box in Finder
+
+`client/finder-mount.sh` mounts the box's filesystem into Finder over your
+existing SSH/Tailscale connection, using FUSE-T (no kernel extension) + sshfs.
+This is **client-side**, not part of the playbook (which runs on the box).
+
+```bash
+./client/finder-mount.sh        # first run installs FUSE-T (one password), then mounts
+./client/finder-mount.sh -u     # unmount
+```
+
+It targets the `contabo` SSH alias, so a migration needs nothing here. To make a
+migration fully zero-touch, name the new Tailscale node `contabo` and set the
+alias `HostName` to its MagicDNS name (`contabo`) instead of a hardcoded IP.
