@@ -26,6 +26,7 @@ apt_packages:
   - tree
   - python3-pip
   - python3-venv
+  - sox # audio recording for Claude Code voice mode
 
 # Node major version (for Claude Code, etc.)
 node_major: "22"
