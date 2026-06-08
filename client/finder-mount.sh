@@ -37,8 +37,18 @@ fi
 
 # --- mount ----------------------------------------------------------------
 mkdir -p "$MOUNT"
+
+# A FUSE/sshfs mount goes stale after sleep or a network drop: it still appears
+# in the mount table, but Finder shows "you don't have permission to see its
+# contents" and any access hangs. Probe it with a short timeout (perl alarm —
+# always present on macOS, no GNU coreutils needed); if it's healthy, done; if
+# it's stale, force-clear it so a re-run always recovers.
 if mount | grep -q " on ${MOUNT} "; then
-  echo "already mounted: $MOUNT"; open "$MOUNT"; exit 0
+  if perl -e 'alarm 6; exec @ARGV or exit 1' ls "$MOUNT" >/dev/null 2>&1; then
+    echo "already mounted (healthy): $MOUNT"; open "$MOUNT"; exit 0
+  fi
+  echo "==> stale mount detected — clearing"
+  umount "$MOUNT" 2>/dev/null || diskutil unmount force "$MOUNT" >/dev/null 2>&1 || true
 fi
 
 echo "==> Mounting ${HOST}:${REMOTE} -> ${MOUNT}"
