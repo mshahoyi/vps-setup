@@ -79,9 +79,16 @@ existing SSH/Tailscale connection, using FUSE-T (no kernel extension) + sshfs.
 This is **client-side**, not part of the playbook (which runs on the box).
 
 ```bash
-./client/finder-mount.sh        # first run installs FUSE-T (one password), then mounts
-./client/finder-mount.sh -u     # unmount
+./client/finder-mount.sh            # first run installs FUSE-T (one password), then mounts
+./client/finder-mount.sh -u         # unmount
+./client/finder-mount.sh --install-agent     # auto-(re)mount on login + every 60s
+./client/finder-mount.sh --uninstall-agent   # stop auto-mounting
 ```
+
+A sshfs mount goes stale after sleep / a network drop (Finder then says "you
+don't have permission to see its contents"). Re-running the script self-heals
+it; `--install-agent` installs a LaunchAgent that does so automatically on login
+and every 60s, so you never see the error.
 
 It targets the `contabo` SSH alias, so a migration needs nothing here. To make a
 migration fully zero-touch, name the new Tailscale node `contabo` and set the
