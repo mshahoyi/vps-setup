@@ -19,7 +19,9 @@
 set -euo pipefail
 
 HOST="${HOST:-contabo}"          # SSH alias from ~/.ssh/config (key auth, Tailscale)
-REMOTE="${REMOTE:-/root}"        # path on the box to expose
+REMOTE="${REMOTE:-/root/dev}"    # path on the box to expose (NOT /root — mounting the
+                                 # home dir risks a Finder perms change tripping sshd
+                                 # StrictModes and locking out all key logins)
 MOUNT="${MOUNT:-$HOME/mnt/$HOST}"
 LABEL="dev.attolabs.finder-mount.${HOST}"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
