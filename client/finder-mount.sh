@@ -110,16 +110,19 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
 
-# A FUSE/sshfs mount goes stale after sleep or a network drop: it still appears
-# in the mount table, but Finder shows "you don't have permission to see its
-# contents" and any access hangs. Probe with a GENEROUS timeout (perl alarm —
-# always present on macOS); if healthy, leave it ALONE (never churn a live
-# mount); only if it genuinely hangs do we force-clear and remount.
+# Liveness check that CANNOT false-positive. The old approach probed the mount
+# with `ls`+timeout, but in the LaunchAgent's context that probe intermittently
+# reported a healthy mount as stale — so the agent tore it down and remounted
+# every 60s, kicking Finder out of the volume. Instead: the mount is backed by a
+# persistent `sshfs` process whose argv contains the mountpoint. If that process
+# is alive, the mount is live — do NOTHING (sshfs's own `-o reconnect` rides out
+# transient network drops). Only if the mount is listed but its sshfs is gone is
+# it genuinely dead, so we clear and remount.
 if mount | grep -q " on ${MOUNT} "; then
-  if perl -e 'alarm 12; exec @ARGV or exit 1' ls "$MOUNT" >/dev/null 2>&1; then
-    echo "already mounted (healthy): $MOUNT"; reveal; exit 0
+  if pgrep -f "sshfs.*${MOUNT}" >/dev/null 2>&1; then
+    echo "healthy (mounted, sshfs alive) — nothing to do"; reveal; exit 0
   fi
-  echo "==> stale mount detected — clearing"
+  echo "==> mount present but sshfs process gone — clearing"
   umount "$MOUNT" 2>/dev/null || diskutil unmount force "$MOUNT" >/dev/null 2>&1 || true
 fi
 
