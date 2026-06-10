@@ -19,9 +19,11 @@
 set -euo pipefail
 
 HOST="${HOST:-contabo}"          # SSH alias from ~/.ssh/config (key auth, Tailscale)
-REMOTE="${REMOTE:-/root/dev}"    # path on the box to expose (NOT /root — mounting the
-                                 # home dir risks a Finder perms change tripping sshd
-                                 # StrictModes and locking out all key logins)
+REMOTE="${REMOTE:-/}"            # path on the box to expose (whole filesystem).
+                                 # Safe to mount /: the home dir is a sub-folder, not
+                                 # the mount root. But do NOT change perms on /root
+                                 # itself via Finder — sshd StrictModes would then lock
+                                 # out key logins.
 MOUNT="${MOUNT:-$HOME/mnt/$HOST}"
 LABEL="dev.attolabs.finder-mount.${HOST}"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
@@ -90,13 +92,31 @@ fi
 # --- mount ----------------------------------------------------------------
 mkdir -p "$MOUNT"
 
+# Serialize runs. The LaunchAgent fires every 60s; if a previous run is still
+# mounting/probing, overlapping runs can race and tear down a HEALTHY mount
+# (the flapping that caused "remote host has disconnected"). An atomic mkdir
+# lock makes a new run bow out instead.
+LOCK="${TMPDIR:-/tmp}/finder-mount-${HOST}.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  # A normal run finishes in seconds; if the lock is older than 3 min it was
+  # orphaned by a killed run — steal it so we never block remounts forever.
+  age=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || echo 0) ))
+  if [ "$age" -gt 180 ]; then
+    rmdir "$LOCK" 2>/dev/null || true
+    mkdir "$LOCK" 2>/dev/null || { echo "lock contended — skipping"; exit 0; }
+  else
+    echo "another run in progress — skipping"; exit 0
+  fi
+fi
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
 # A FUSE/sshfs mount goes stale after sleep or a network drop: it still appears
 # in the mount table, but Finder shows "you don't have permission to see its
-# contents" and any access hangs. Probe it with a short timeout (perl alarm —
-# always present on macOS, no GNU coreutils needed); if it's healthy, done; if
-# it's stale, force-clear it so a re-run always recovers.
+# contents" and any access hangs. Probe with a GENEROUS timeout (perl alarm —
+# always present on macOS); if healthy, leave it ALONE (never churn a live
+# mount); only if it genuinely hangs do we force-clear and remount.
 if mount | grep -q " on ${MOUNT} "; then
-  if perl -e 'alarm 6; exec @ARGV or exit 1' ls "$MOUNT" >/dev/null 2>&1; then
+  if perl -e 'alarm 12; exec @ARGV or exit 1' ls "$MOUNT" >/dev/null 2>&1; then
     echo "already mounted (healthy): $MOUNT"; reveal; exit 0
   fi
   echo "==> stale mount detected — clearing"
