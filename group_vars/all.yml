@@ -88,7 +88,8 @@ tailscale_lock_ssh: false
 # OPT-IN recovery channel: SSH authenticated by tailnet identity (immune to
 # key/perms/fail2ban lockouts). Requires an "accept" ssh rule in the tailnet ACL
 # and rotates the host key (clients re-trust once). See tasks/tailscale.yml.
-tailscale_ssh: false
+# Enabled: the ACL has an "accept" ssh rule, so this is the resilient way in.
+tailscale_ssh: true
 
 # Fine-grained PAT for UNATTENDED git access (optional). NEVER hardcode/commit it.
 # Pass at runtime so it's only ever in memory + a 0600 file:

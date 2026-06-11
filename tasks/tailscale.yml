@@ -36,7 +36,9 @@
   # ("check" forces periodic browser re-auth, which breaks the mount):
   #   "ssh": [{ "action": "accept", "src": ["autogroup:member"],
   #             "dst": ["autogroup:self"], "users": ["root","autogroup:nonroot"] }]
-  ansible.builtin.command: tailscale set --ssh
+  # --accept-risk=lose-ssh: the command otherwise aborts when run over a Tailscale
+  # connection (it reroutes port 22 mid-flight). Required for non-interactive runs.
+  ansible.builtin.command: tailscale set --ssh --accept-risk=lose-ssh
   when: tailscale_ssh | bool
   changed_when: false
 
