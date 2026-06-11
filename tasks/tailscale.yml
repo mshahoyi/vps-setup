@@ -26,6 +26,20 @@
   when: tailscale_authkey | length > 0
   no_log: true
 
+- name: Enable Tailscale SSH — tailnet-identity recovery channel — OPT-IN
+  # Authenticates SSH by tailnet identity instead of authorized_keys, so it's
+  # immune to the key/StrictModes/fail2ban failure modes that can lock out
+  # normal sshd. NOTE: this makes tailscaled take over port 22 on the tailnet
+  # interface (the box's host key changes — clients re-trust once), and it
+  # REQUIRES an `ssh` rule in the tailnet ACL policy. For an UNATTENDED client
+  # (the sshfs Finder mount) the rule's action must be "accept", not "check"
+  # ("check" forces periodic browser re-auth, which breaks the mount):
+  #   "ssh": [{ "action": "accept", "src": ["autogroup:member"],
+  #             "dst": ["autogroup:self"], "users": ["root","autogroup:nonroot"] }]
+  ansible.builtin.command: tailscale set --ssh
+  when: tailscale_ssh | bool
+  changed_when: false
+
 - name: Remove public SSH (port 22) from the firewall — OPT-IN lockdown
   ansible.builtin.command: "ufw delete allow {{ ssh_port | default(22) }}/tcp"
   when: tailscale_lock_ssh | bool

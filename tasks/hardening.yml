@@ -47,6 +47,14 @@
     dest: /etc/fail2ban/jail.local
     mode: "0644"
     content: |
+      [DEFAULT]
+      # Never ban loopback or the Tailscale tailnet (100.64.0.0/10): those are
+      # YOUR OWN trusted devices reaching the box over the private mesh. A
+      # transient key/auth hiccup from your Mac or phone must not get its tailnet
+      # IP banned — on a box whose public SSH is already firewalled off, that
+      # reads as "Connection refused" and locks you out (exactly what happened).
+      ignoreip = 127.0.0.1/8 ::1 100.64.0.0/10
+
       [sshd]
       enabled = true
       port = {{ ssh_port | default(22) }}
