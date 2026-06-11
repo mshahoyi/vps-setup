@@ -1,0 +1,82 @@
+---
+# Always-on Layali dev services, supervised by pm2:
+#   Metro bundler + admin (dev/prod) + Storybook — auto-restart on crash and
+#   resurrect on reboot (pm2 systemd unit + saved process list).
+#
+# Depends on:
+#   - the layali repo being cloned (see github_repos in group_vars) AND its
+#     workspace deps installed (this task runs `pnpm install`).
+#   - the app ENV files (root .env etc.) being present. Those are SECRETS, NOT
+#     in this repo — provision them out of band (see SECURITY.md / your key
+#     backup). Without them the services boot but can't reach Convex/Clerk, so
+#     we only `pm2 start` once the root .env exists; everything else (pm2 +
+#     systemd + saved config) is still set up so a later `pm2 start` just works.
+#
+# Idempotent: safe to re-run. Toggle with `layali_services_enabled`.
+
+- name: Enable corepack (provides pnpm)
+  ansible.builtin.command: corepack enable
+  changed_when: false
+
+- name: Locate the pnpm binary
+  ansible.builtin.command: which pnpm
+  register: pnpm_which
+  changed_when: false
+
+- name: Set pnpm facts
+  ansible.builtin.set_fact:
+    pnpm_path: "{{ pnpm_which.stdout | trim }}"
+
+- name: Find the pnpm global bin dir (where the pm2 shim lands)
+  ansible.builtin.command: "{{ pnpm_path }} bin -g"
+  register: pnpm_global_bin
+  changed_when: false
+
+- name: Install pm2 globally (pnpm, respects the global supply-chain cooldown)
+  ansible.builtin.command: "{{ pnpm_path }} add -g pm2"
+  args:
+    creates: "{{ pnpm_global_bin.stdout | trim }}/pm2"
+
+- name: Set pm2 path
+  ansible.builtin.set_fact:
+    pm2_path: "{{ pnpm_global_bin.stdout | trim }}/pm2"
+
+- name: Install Layali workspace deps (so the services can boot)
+  ansible.builtin.command:
+    cmd: "{{ pnpm_path }} install --frozen-lockfile"
+    chdir: "{{ dev_dir }}/layali"
+  changed_when: false
+
+- name: Deploy the pm2 ecosystem config
+  ansible.builtin.template:
+    src: templates/layali-pm2.config.cjs.j2
+    dest: "{{ dev_dir }}/layali-pm2.config.cjs"
+    mode: "0644"
+
+- name: Configure pm2 to start on boot (systemd, root)
+  ansible.builtin.command: "{{ pm2_path }} startup systemd -u root --hp {{ ansible_env.HOME }}"
+  changed_when: false
+
+- name: Check for the app env file (services need it to reach Convex/Clerk)
+  ansible.builtin.stat:
+    path: "{{ dev_dir }}/layali/.env"
+  register: layali_env
+
+- name: Start (or reload) the Layali services + freeze for reboot
+  ansible.builtin.shell: |
+    set -euo pipefail
+    "{{ pm2_path }}" start "{{ dev_dir }}/layali-pm2.config.cjs" || \
+      "{{ pm2_path }}" reload "{{ dev_dir }}/layali-pm2.config.cjs"
+    "{{ pm2_path }}" save
+  args:
+    executable: /bin/bash
+  when: layali_env.stat.exists
+  changed_when: false
+
+- name: Warn if env is missing (services not started)
+  ansible.builtin.debug:
+    msg: >-
+      {{ dev_dir }}/layali/.env not found — pm2 + boot unit are configured, but
+      the services were NOT started (they'd fail without Convex/Clerk secrets).
+      Provision the env files, then run: pm2 start {{ dev_dir }}/layali-pm2.config.cjs && pm2 save
+  when: not layali_env.stat.exists

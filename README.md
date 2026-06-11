@@ -93,3 +93,30 @@ and every 60s, so you never see the error.
 It targets the `contabo` SSH alias, so a migration needs nothing here. To make a
 migration fully zero-touch, name the new Tailscale node `contabo` and set the
 alias `HostName` to its MagicDNS name (`contabo`) instead of a hardcoded IP.
+
+## Layali always-on dev services
+
+The box runs the Layali dev servers under **pm2** so they stay up (auto-restart
+on crash) and come back on reboot:
+
+| Service | URL (over tailnet) | Notes |
+|---|---|---|
+| Metro bundler | `exp://contabo:8081` | dev client |
+| Admin (dev) | `http://contabo:5173` | test Convex |
+| Admin (prod) | `http://contabo:5174` | live Convex — manage live games |
+| Storybook | `http://contabo:6006` | `@layali/ui` |
+
+Set up by `tasks/layali-services.yml` (toggle `layali_services_enabled`). It
+installs pm2, deploys `templates/layali-pm2.config.cjs.j2`, installs the layali
+workspace deps, registers the pm2 systemd boot unit, and starts + saves the
+process list.
+
+**Requires the app `.env` secrets** (Convex/Clerk keys) at `~/dev/layali/.env` —
+these are NOT in this repo. If they're missing, the playbook configures pm2 +
+the boot unit but skips starting the services; once the env is in place:
+
+```bash
+pm2 start ~/dev/layali-pm2.config.cjs && pm2 save
+```
+
+Day-to-day: `pm2 status` · `pm2 logs <name>` · `pm2 restart <name>` · `pm2 save`.

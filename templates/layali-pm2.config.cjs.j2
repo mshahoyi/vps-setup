@@ -1,0 +1,36 @@
+// Managed by vps-setup (tasks/layali-services.yml) — DO NOT edit on the box;
+// change the template + re-run the playbook.
+//
+// pm2 supervision for the Layali dev box: keeps the Metro bundler, the two admin
+// dashboards, and Storybook always-on (auto-restart on crash; resurrect on reboot
+// via the pm2 systemd unit + `pm2 save`). All bind to all interfaces and are
+// reached over the tailnet by hostname:
+//   - Metro:        exp://{{ tailscale_hostname }}:8081   (dev client)
+//   - admin (dev):  http://{{ tailscale_hostname }}:5173  (test Convex)
+//   - admin (prod): http://{{ tailscale_hostname }}:5174  (live Convex)
+//   - Storybook:    http://{{ tailscale_hostname }}:6006  (@layali/ui)
+//
+// Each app just runs the repo's existing pnpm script (which carries its own env).
+const cwd = '{{ dev_dir }}/layali';
+const PNPM = '{{ pnpm_path }}';
+
+const app = (name, script) => ({
+  name,
+  cwd,
+  script: PNPM,
+  args: script,
+  interpreter: 'none', // pnpm is its own launcher; don't wrap in node
+  autorestart: true,
+  max_restarts: 20,
+  restart_delay: 3000,
+  time: true,
+});
+
+module.exports = {
+  apps: [
+    app('layali-metro', 'mobile'),
+    app('layali-admin', 'admin'),
+    app('layali-admin-prod', 'admin:prod'),
+    app('layali-storybook', 'storybook'),
+  ],
+};

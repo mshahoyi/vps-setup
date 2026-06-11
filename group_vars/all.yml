@@ -91,3 +91,10 @@ tailscale_lock_ssh: false
 #   GITHUB_PAT=github_pat_xxx ansible-playbook -i inventory.ini site.yml --tags hardening
 # See SECURITY.md for how to scope it (least privilege + short expiry).
 github_pat: "{{ lookup('env', 'GITHUB_PAT') | default('', true) }}"
+
+# ------------------------------------------------------- layali dev services -
+# Keep the Layali dev servers always-on via pm2 (tasks/layali-services.yml):
+# Metro :8081, admin dev :5173, admin prod :5174, Storybook :6006 — auto-restart
+# + resurrect on reboot. Needs the layali repo cloned + its .env secrets present
+# (provisioned out of band). Set false to skip.
+layali_services_enabled: true

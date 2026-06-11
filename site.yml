@@ -167,3 +167,9 @@
     - name: Set up Tailscale (private SSH mesh)
       ansible.builtin.import_tasks: tasks/tailscale.yml
       tags: [tailscale]
+
+    # ----------------------------------------------- layali always-on services
+    - name: Keep Layali dev services (Metro, admin, Storybook) always-on via pm2
+      ansible.builtin.import_tasks: tasks/layali-services.yml
+      when: layali_services_enabled | bool
+      tags: [layali, services]
