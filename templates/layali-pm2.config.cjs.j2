@@ -26,11 +26,29 @@ const app = (name, script) => ({
   time: true,
 });
 
+// Storybook is served as the STATIC build, not the dev server: Storybook 10's
+// rolldown dev-optimizer can't erase expo-modules-core's type-only `declare class`
+// re-exports (it ships source-only), so the dev server crash-loops / fails to
+// render the kit. The full static build handles it (built by the playbook before
+// pm2 start; rebuild on change with
+// `pnpm --filter @layali/ui exec storybook build -o storybook-static`).
+const storybookStatic = {
+  name: 'layali-storybook',
+  cwd: '{{ dev_dir }}/layali/packages/ui/storybook-static',
+  script: 'python3',
+  args: '-m http.server 6006 --bind 0.0.0.0',
+  interpreter: 'none',
+  autorestart: true,
+  max_restarts: 20,
+  restart_delay: 3000,
+  time: true,
+};
+
 module.exports = {
   apps: [
     app('layali-metro', 'mobile'),
     app('layali-admin', 'admin'),
     app('layali-admin-prod', 'admin:prod'),
-    app('layali-storybook', 'storybook'),
+    storybookStatic,
   ],
 };

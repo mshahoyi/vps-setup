@@ -47,6 +47,15 @@
     chdir: "{{ dev_dir }}/layali"
   changed_when: false
 
+- name: Build the Storybook static bundle (pm2 serves it; the dev server can't render the kit)
+  # Storybook 10's rolldown dev-optimizer can't handle expo-modules-core's source-only
+  # type-only `declare class` re-exports — only the full static build does. Needs no app
+  # secrets (it's the UI kit), so it runs regardless of the .env check used below for pm2.
+  ansible.builtin.command:
+    cmd: "{{ pnpm_path }} --filter @layali/ui exec storybook build -o storybook-static"
+    chdir: "{{ dev_dir }}/layali"
+  changed_when: false
+
 - name: Deploy the pm2 ecosystem config
   ansible.builtin.template:
     src: templates/layali-pm2.config.cjs.j2
