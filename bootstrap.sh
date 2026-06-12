@@ -50,7 +50,9 @@ fi
 echo "==> Authenticating with GitHub"
 if ! gh auth status >/dev/null 2>&1; then
   # --web prints a one-time code + URL; open it on your laptop and paste the code.
-  gh auth login --hostname github.com --git-protocol https --web
+  # `--scopes workflow` is needed to push .github/workflows/* (CI) — GitHub gates
+  # workflow files behind that scope; the default `repo` scope alone is rejected.
+  gh auth login --hostname github.com --git-protocol https --web --scopes workflow
 fi
 # Make git use gh's token as its credential helper -> private clones just work.
 gh auth setup-git
