@@ -29,9 +29,16 @@ apt_packages:
   - python3-pip
   - python3-venv
   - sox # audio recording for Claude Code voice mode
+  - poppler-utils # pdfinfo/pdftotext/pdftoppm — inspect & page-count compiled PDFs (papers)
 
 # Node major version (for Claude Code, etc.)
 node_major: "22"
+
+# LaTeX via Tectonic — a single self-contained binary that fetches its own TeX
+# bundle on first compile (no multi-GB texlive install). Used to build the COLM
+# paper (z3research/paper, see its compile.sh). Installed from the official
+# GitHub release. Bump this to upgrade; tasks/latex.yml is idempotent.
+tectonic_version: "0.16.9"
 
 # pnpm is installed via corepack (ships with Node). This is the supply-chain
 # release-age cooldown (in MINUTES) applied globally: refuse npm package versions

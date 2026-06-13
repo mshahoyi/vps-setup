@@ -118,6 +118,11 @@
       when: claude_bin.rc != 0
       tags: [claude]
 
+    # ----------------------------------------------------------------- latex -
+    - name: Install LaTeX toolchain (Tectonic) for building papers
+      ansible.builtin.import_tasks: tasks/latex.yml
+      tags: [latex]
+
     # ---------------------------------------------------------------- repos --
     - name: Ensure dev directory exists
       ansible.builtin.file:

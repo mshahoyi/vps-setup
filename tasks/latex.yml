@@ -1,0 +1,35 @@
+---
+# LaTeX toolchain via Tectonic.
+#
+# Tectonic is a single self-contained binary that downloads only the TeX files a
+# document actually needs (on first compile), so there is no multi-GB texlive
+# install to maintain. We pull the official static (musl) release binary and drop
+# it in /usr/local/bin. Idempotent: skipped once the binary exists.
+#
+# Used to build the COLM paper at z3research/paper (see that repo's compile.sh,
+# which just calls `tectonic main.tex`). poppler-utils (installed via apt_packages)
+# provides pdfinfo/pdftotext/pdftoppm for page-counting and inspecting the output.
+
+- name: Detect whether Tectonic is already installed at the desired version
+  ansible.builtin.command: tectonic --version
+  register: tectonic_v
+  failed_when: false
+  changed_when: false
+
+- name: Install Tectonic ({{ tectonic_version }}) from the official GitHub release
+  ansible.builtin.shell: |
+    set -euo pipefail
+    case "{{ ansible_architecture }}" in
+      x86_64)  ARCH=x86_64 ;;
+      aarch64) ARCH=aarch64 ;;
+      *) echo "unsupported arch: {{ ansible_architecture }}" >&2; exit 1 ;;
+    esac
+    URL="https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40{{ tectonic_version }}/tectonic-{{ tectonic_version }}-${ARCH}-unknown-linux-musl.tar.gz"
+    TMP="$(mktemp -d)"
+    curl -fsSL "$URL" -o "$TMP/tectonic.tar.gz"
+    tar xzf "$TMP/tectonic.tar.gz" -C "$TMP"
+    install -m 0755 "$TMP/tectonic" /usr/local/bin/tectonic
+    rm -rf "$TMP"
+  args:
+    executable: /bin/bash
+  when: tectonic_v.rc != 0 or (tectonic_version not in (tectonic_v.stdout | default('')))
