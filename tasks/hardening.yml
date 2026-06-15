@@ -155,6 +155,51 @@
       then re-run:  ansible-playbook -i inventory.ini site.yml --tags hardening
   when: not have_ssh_keys
 
+# ------------------------------ Docker-published-port firewall (ufw bypass) --
+# The Supabase CLI (used for Layali's local e2e stack) publishes every service
+# port on 0.0.0.0, and Docker's DNAT rules run BEFORE ufw's filter/INPUT — so
+# ufw's default-deny does NOT cover Docker-published ports. Without this, local
+# Postgres (54322) and the no-auth Studio are reachable on the public IP. We drop
+# external ingress to the Supabase local-dev range (54320-54330) in raw/PREROUTING
+# (before DNAT) on the public NIC only; loopback + tailscale are unaffected.
+# A boot-time systemd oneshot re-applies it (raw rules don't persist a reboot).
+- name: Install the local-dev port firewall script
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/localdev-firewall.sh
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      set -eu
+      IF="$(ip -4 route show default | awk '{print $5; exit}')"
+      [ -n "$IF" ] || exit 0
+      iptables -t raw -C PREROUTING -i "$IF" -p tcp --dport 54320:54330 -j DROP 2>/dev/null \
+        || iptables -t raw -I PREROUTING -i "$IF" -p tcp --dport 54320:54330 -j DROP
+
+- name: Install the local-dev firewall systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/localdev-firewall.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Block external access to Supabase local-dev ports (Docker/ufw bypass mitigation)
+      After=docker.service network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/localdev-firewall.sh
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start the local-dev port firewall
+  ansible.builtin.systemd:
+    name: localdev-firewall.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
 # --------------------------------- optional unattended git credential (PAT) --
 - name: Store fine-grained PAT for unattended git
   when: github_pat | length > 0
