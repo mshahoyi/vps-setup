@@ -1,0 +1,28 @@
+---
+# Docker Engine + Compose plugin.
+#
+# Used to run the Supabase local stack (`supabase start`) for Layali's offline
+# end-to-end tests: a full Postgres + GoTrue + PostgREST + Realtime + edge-runtime
+# stack on localhost, so e2e tests exercise the REAL backend code without any
+# request leaving the box (fast, deterministic, no cloud cost). Only true third
+# parties (ZeptoMail, Reloadly) are stubbed.
+#
+# Distro packages (docker.io + docker-compose-v2) are used rather than the
+# upstream Docker CE apt repo — simpler, no extra key/repo to maintain, and
+# sufficient for the Supabase CLI. Idempotent: apt + service modules no-op when
+# already in the desired state.
+
+- name: Install Docker engine + Compose plugin
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose-v2
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure the Docker daemon is enabled and running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true

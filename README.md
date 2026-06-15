@@ -63,6 +63,7 @@ Tasks are tagged, so you can apply just part of it:
 ```bash
 ansible-playbook -i inventory.ini site.yml --tags repos     # just (re)clone repos
 ansible-playbook -i inventory.ini site.yml --tags base,node
+ansible-playbook -i inventory.ini site.yml --tags docker    # Docker (Supabase local stack for e2e)
 ```
 
 ## Driving a remote box from your laptop instead

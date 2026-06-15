@@ -118,6 +118,11 @@
       when: claude_bin.rc != 0
       tags: [claude]
 
+    # ---------------------------------------------------------------- docker -
+    - name: Install Docker (Supabase local stack for offline e2e tests)
+      ansible.builtin.import_tasks: tasks/docker.yml
+      tags: [docker]
+
     # ----------------------------------------------------------------- latex -
     - name: Install LaTeX toolchain (Tectonic) for building papers
       ansible.builtin.import_tasks: tasks/latex.yml
